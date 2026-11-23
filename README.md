@@ -88,3 +88,10 @@ Follow this recipe to open, inspect, customize, and install `org.ether.sports` i
 - ESPN returns HTTP 404 for `/summary` on `f1`, `pga`, and `ufc`; event detail falls back to scoreboard data to build race results/weekend sessions, golf leaderboards, and fight cards.
 - NBA and MLB standings returned by ESPN are not pre-sorted by rank; the provider sorts entries by `playoffSeed`/`rank` ascending before rendering tables.
 - Test fixtures in `tests/fixtures/` are trimmed recordings of real ESPN responses captured on 2026-11-22.
+
+## Releasing
+
+1. Bump `version` in `manifest.json`. Set `MIN_ETHER` to the oldest Ether release the new version needs. Optionally add a `## <version>` section to `CHANGELOG.md`.
+2. Commit, then tag it: `git tag v<version> && git push origin v<version>`.
+3. CI checks, tests and packs the plugin, and attaches `<id>-<version>.etherpkg` to a GitHub release.
+4. The [ether-plugins](https://github.com/braedonsaunders/ether-plugins) marketplace picks up the release within the hour and opens a PR adding the version. Merge it, and Ether offers the update to every server that has the plugin installed.

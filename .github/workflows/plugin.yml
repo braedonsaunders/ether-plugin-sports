@@ -1,0 +1,67 @@
+name: Plugin
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # Ether release whose `ether plugin` kit checks and packs this plugin.
+      ETHER_REF: ${{ vars.ETHER_REF || 'v0.3.19' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Ether
+        uses: actions/checkout@v4
+        with:
+          repository: braedonsaunders/ether
+          ref: ${{ env.ETHER_REF }}
+          path: .ether
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .ether/go.mod
+          cache-dependency-path: .ether/go.sum
+      - name: Build the ether CLI
+        working-directory: .ether
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/bin/ether" ./cmd/ether
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Stage the plugin
+        run: |
+          mkdir -p "$RUNNER_TEMP/plugin"
+          tar --exclude=.git --exclude=.ether --exclude=.github -cf - . | tar -xf - -C "$RUNNER_TEMP/plugin"
+      - name: Conformance check
+        run: ether plugin check "$RUNNER_TEMP/plugin"
+      - name: Recorded fixtures
+        if: hashFiles('tests/fixtures.json') != ''
+        run: ether plugin test "$RUNNER_TEMP/plugin"
+      - name: Pack
+        id: pack
+        run: |
+          id=$(python3 -c 'import json;print(json.load(open("manifest.json"))["id"])')
+          ver=$(python3 -c 'import json;print(json.load(open("manifest.json"))["version"])')
+          out="$RUNNER_TEMP/$id-$ver.etherpkg"
+          ether plugin pack -o "$out" "$RUNNER_TEMP/plugin"
+          ether plugin check "$out"
+          echo "id=$id" >> "$GITHUB_OUTPUT"; echo "version=$ver" >> "$GITHUB_OUTPUT"; echo "pkg=$out" >> "$GITHUB_OUTPUT"
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          test "$tag" = "v${{ steps.pack.outputs.version }}" || { echo "::error::tag $tag does not match manifest version ${{ steps.pack.outputs.version }}"; exit 1; }
+          min=$(tr -d ' \n' < MIN_ETHER)
+          notes="minEther: $min"
+          if [ -f CHANGELOG.md ]; then notes="$notes"$'\n\n'"$(awk -v v="## ${{ steps.pack.outputs.version }}" '$0==v{f=1;next} /^## /{f=0} f' CHANGELOG.md)"; fi
+          gh release create "$tag" "${{ steps.pack.outputs.pkg }}" --title "${{ steps.pack.outputs.id }} ${{ steps.pack.outputs.version }}" --notes "$notes"
