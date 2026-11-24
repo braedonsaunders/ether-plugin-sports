@@ -187,6 +187,7 @@ test("manifest, settings schema, i18n, and 17 default leagues satisfy contract a
   assert.deepEqual(manifest.ether.permissions.network, [
     "site.api.espn.com",
     "site.web.api.espn.com",
+    "a.espncdn.com",
   ]);
 
   // Live feed contribution (spec A1)
