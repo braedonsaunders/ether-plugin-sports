@@ -1,6 +1,6 @@
 {
   "id": "org.ether.sports",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "name": "Sports",
   "description": "Live scores, standings and schedules across 17 leagues from ESPN.",
   "ether": {
